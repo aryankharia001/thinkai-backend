@@ -1,54 +1,80 @@
 const Content = require('../models/Content');
+const Library = require('../models/Library')
+const cloudinary = require("../Utils/cloudinary"); // adjust path
 
-// Add new content
 const addContent = async (req, res) => {
-    try {
-        const { title, description, videoUrl, method, prompt, library } = req.body;
+  try {
+    const { title, description, method, prompt, library } = req.body;
 
-        if (!title || !description || !method || !prompt || !library) {
-            return res.status(400).json({
-                status: 400,
-                message: "All required fields must be provided"
-            });
-        }
-
-        // Check if content with same title exists
-        const existingContent = await Content.findOne({
-            title: { $regex: new RegExp(`^${title}$`, 'i') }
-        });
-
-        if (existingContent) {
-            return res.status(409).json({
-                status: 409,
-                message: "Content with this title already exists"
-            });
-        }
-
-        const newContent = new Content({
-            title,
-            description,
-            videoUrl: videoUrl || null,
-            method,
-            prompt,
-            library: library  // handle library references
-        });
-
-        const savedContent = await newContent.save();
-
-        res.status(201).json({
-            status: 201,
-            message: "Content created successfully",
-            data: savedContent
-        });
-
-    } catch (error) {
-        console.error('Error creating content:', error);
-        res.status(500).json({
-            status: 500,
-            message: "Internal server error",
-            error: error.message
-        });
+    if (!title || !description || !method || !prompt || !library) {
+      return res.status(400).json({
+        status: 400,
+        message: "All required fields must be provided",
+      });
     }
+
+    // ✅ Check if content with same title exists
+    const existingContent = await Content.findOne({
+      title: { $regex: new RegExp(`^${title}$`, "i") },
+    });
+
+    if (existingContent) {
+      return res.status(409).json({
+        status: 409,
+        message: "Content with this title already exists",
+      });
+    }
+
+    // ✅ Check if library exists
+    const existingLibrary = await Library.findById(library);
+    if (!existingLibrary) {
+      return res.status(404).json({
+        status: 404,
+        message: "Library not found",
+      });
+    }
+
+    let videoUrl = null;
+
+    // ✅ Upload video if provided
+    if (req.file) {
+      const uploadResponse = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "video", // 👈 IMPORTANT for video
+        folder: "library_videos",
+      });
+
+      videoUrl = uploadResponse.secure_url;
+    }
+
+    // ✅ Create new content
+    const newContent = new Content({
+      title,
+      description,
+      videoUrl,
+      method,
+      prompt,
+      library,
+    });
+
+    const savedContent = await newContent.save();
+
+    // ✅ Push into Library
+    existingLibrary.content.push(savedContent._id);
+    await existingLibrary.save();
+
+    res.status(201).json({
+      status: 201,
+      message: "Content created successfully",
+      data: savedContent,
+    });
+  } catch (error) {
+    console.error("Error creating content:", error);
+    res.status(500).json({
+      status: 500,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
 };
 
 // Get all content

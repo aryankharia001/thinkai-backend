@@ -1,16 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../middlewares/multer')
 const {deleteContent,updateContent,getContentById,getAllContent,addContent,searchContent,getContentByLibraryId} = require('../controllers/ContentController');
 
 //add content
-router.post('/content', addContent);
+router.post('/content',upload.single("video"), addContent);
 
 // Get all libraries
 router.get('/allcontents', getAllContent);
 router.get('/library/:libraryId', getContentByLibraryId);
 
 // Search libraries
-router.get('/libra/search', searchContent);
+router.get('/content/search', searchContent);
 
 // Get single library by ID
 router.get('/content/:id', getContentById);
