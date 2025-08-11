@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import axios from "axios";
 import cron from "node-cron";
+import News from "./models/news.js";
 
 dotenv.config();
 
@@ -26,6 +27,12 @@ async function getAIHeadlines() {
   };
   
   try {    
+    const existing = await News.findOne({ date: today });
+    if (existing) {
+      console.log("✅ Returning today's headlines from DB (skipping API).");
+      return existing.headlines; // return stored headlines
+    }
+    
     const response = await axios.get('https://newsapi.org/v2/everything', { params });
     
     if (!response.data.articles || response.data.articles.length === 0) {
@@ -87,27 +94,53 @@ async function getAIHeadlines() {
   }
 }
 
+
 async function fetchAndDisplayHeadlines() {
-  console.log(`\n🕐 Fetching AI headlines at ${new Date().toLocaleString()}...`);
-  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  console.log(`\n🕐 Checking if headlines already exist for ${today.toDateString()}...`);
+
+  // Step 1: Check DB first
+  const existing = await News.findOne({ date: today });
+  if (existing) {
+    console.log("✅ Headlines already stored for today. Skipping API call.");
+    return;
+  }
+
+  // Step 2: Only fetch if no headlines exist
   if (!process.env.NEWS_API) {
-    console.error("NEWS_API environment variable not found!");
+    console.error("❌ NEWS_API environment variable not found!");
     return;
   }
-  
+
+  console.log(`📡 Fetching AI headlines at ${new Date().toLocaleString()}...`);
   const headlines = await getAIHeadlines();
-  
-  if (headlines.length === 0) {
-    console.log("No AI headlines found.");
+
+  if (!headlines || headlines.length === 0) {
+    console.log("⚠ No AI headlines found.");
     return;
   }
-  
+
   console.log("📰 Top 5 AI Headlines (Last 24 Hours):");
   headlines.forEach((headline, index) => {
     console.log(`${index + 1}. ${headline}`);
   });
   console.log("─".repeat(80));
+
+  // Step 3: Save to DB
+  try {
+    const newsDoc = new News({
+      date: today,
+      headlines: headlines.slice(0, 5) // only first 5
+    });
+    await newsDoc.save();
+    console.log("💾 Headlines saved to database.");
+  } catch (err) {
+    console.error("❌ Error saving headlines:", err);
+  }
 }
+
 
 async function main() {
   console.log("🤖 AI News Scheduler Started!");
@@ -120,16 +153,13 @@ async function main() {
   // Schedule to run every day at 12:00 PM (noon)
   // Cron format: second minute hour day month dayOfWeek
   // "0 0 12 * * *" = At 12:00:00 PM every day
-  cron.schedule('0 0 12 * * *', async () => {
+  // cron.schedule('0 0 12 * * *', async () => {
+  cron.schedule('*/10 * * * * *', async () => {
     await fetchAndDisplayHeadlines();
   }, {
     scheduled: true,
-    timezone: "America/New_York" // Change this to your preferred timezone
+    timezone: "Asia/Kolkata" // Change this to your preferred timezone
   });
-  
-  // Optional: Schedule additional times (uncomment if needed)
-  // cron.schedule('0 0 6 * * *', fetchAndDisplayHeadlines);  // 6 AM
-  // cron.schedule('0 0 18 * * *', fetchAndDisplayHeadlines); // 6 PM
   
   console.log("⏰ Scheduler is running... Press Ctrl+C to stop");
   
