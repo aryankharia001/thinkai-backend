@@ -3,7 +3,7 @@ const Course = require('../models/courses');
 // All courses
 async function getAllCourses(req, res) {
     try {
-      const courses = await Course.find(); // Fetch all courses from DB
+      const courses = await Course.find();
   
       res.status(200).json({
         success: true,
@@ -64,16 +64,68 @@ async function createCourse(req, res) {
     }
 }
 
-
-// ADMIN - Deleting course with id
+// ✅ ADMIN - Deleting course with id (FIXED)
 async function deleteCourse(req, res) {
-    const { id } = req.params;
-    res.json({ message: `Course with ID: ${id} deleted` });
+    try {
+        const { id } = req.params;
+
+        const deletedCourse = await Course.findByIdAndDelete(id);
+
+        if (!deletedCourse) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Course not found" 
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Course "${deletedCourse.title}" deleted successfully`,
+            data: deletedCourse
+        });
+    } catch (err) {
+        console.error("Error deleting course:", err);
+        res.status(500).json({
+            success: false,
+            message: "Server error while deleting course"
+        });
+    }
 }
 
-// ADMIN - update course
-async function updateCourse() {
+// ✅ ADMIN - update course (IMPLEMENTED)
+async function updateCourse(req, res) {
+    try {
+        const { id } = req.params;
+        const { title, description, image } = req.body;
 
+        const updatedCourse = await Course.findByIdAndUpdate(
+            id,
+            { title, description, image },
+            { 
+                new: true, // Return updated document
+                runValidators: true // Run schema validations
+            }
+        );
+
+        if (!updatedCourse) {
+            return res.status(404).json({
+                success: false,
+                message: "Course not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Course updated successfully",
+            data: updatedCourse
+        });
+    } catch (err) {
+        console.error("Error updating course:", err);
+        res.status(500).json({
+            success: false,
+            message: "Server error while updating course"
+        });
+    }
 }
 
 module.exports = {
