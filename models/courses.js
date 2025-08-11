@@ -11,14 +11,8 @@ const courseSchema = new mongoose.Schema({
     required: [true, "Course description is required"],
     trim: true
   },
-  price: {
-    type: Number,
-    required: [true, "Course price is required"],
-    min: 0
-  },
   image: {
-    type: String,
-    default: "https://via.placeholder.com/400x250"
+    type: String
   },
   createdAt: {
     type: Date,

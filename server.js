@@ -5,6 +5,8 @@ const cron = require('node-cron');
 const mongoose = require('mongoose');
 const { fetchHeadlines } = require('./controllers/headlinesController');
 const AuthRoutes = require('./routes/AuthRoutes');
+const UserRoutes = require('./routes/UserRoutes');
+const CourseRoutes = require('./routes/courses');
 
 require('dotenv').config();
 
@@ -18,6 +20,8 @@ app.use(express.json());
 // Routes
 app.use('/api', headlinesRouter);
 app.use('/user', AuthRoutes);
+app.use('/api', UserRoutes);
+app.use('/api', CourseRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)

@@ -1,24 +1,69 @@
-const dotenv = require("dotenv");
-const axios = require("axios");
-const News = require("../models/news.js");
-
-dotenv.config();
+const Course = require('../models/courses');
 
 // All courses
 async function getAllCourses(req, res) {
-    res.json({ message: "Get all courses" });
+    try {
+      const courses = await Course.find(); // Fetch all courses from DB
+  
+      res.status(200).json({
+        success: true,
+        count: courses.length,
+        data: courses
+      });
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+      res.status(500).json({
+        success: false,
+        message: "Server error while fetching courses"
+      });
+    }
 }
 
 // For single course with id
 async function getCourse(req, res) {
-    const { id } = req.params;
-    res.json({ message: `Get course with ID: ${id}` });
+    try {
+      const { id } = req.params;
+  
+      const course = await Course.findById(id);
+  
+      if (!course) {
+        return res.status(404).json({ success: false, message: "No such course found" });
+      }
+  
+      res.status(200).json({ success: true, data: course });
+    } catch (err) {
+      console.error("Error fetching course:", err);
+      res.status(500).json({
+        success: false,
+        message: "Server error while fetching course"
+      });
+    }
 }
 
 // ADMIN - Creating course
 async function createCourse(req, res) {
-    res.json({ message: "Course created" });
+    try {
+      const { title, description } = req.body;
+  
+      if (!title || !description) {
+        return res.status(400).json({ error: "Title and description are required" });
+      }
+  
+      const course = await Course.create({
+        title,
+        description
+      });
+  
+      res.status(201).json({
+        message: "✅ Course created successfully",
+        course
+      });
+    } catch (err) {
+      console.error("Error creating course:", err);
+      res.status(500).json({ error: "Server error" });
+    }
 }
+
 
 // ADMIN - Deleting course with id
 async function deleteCourse(req, res) {
@@ -26,9 +71,15 @@ async function deleteCourse(req, res) {
     res.json({ message: `Course with ID: ${id} deleted` });
 }
 
+// ADMIN - update course
+async function updateCourse() {
+
+}
+
 module.exports = {
     getAllCourses,
     getCourse,
     createCourse,
-    deleteCourse
+    deleteCourse,
+    updateCourse
 };
