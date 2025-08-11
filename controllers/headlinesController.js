@@ -1,12 +1,12 @@
-import dotenv from "dotenv";
-import axios from "axios";
-import News from "../models/news.js";
+const dotenv = require("dotenv");
+const axios = require("axios");
+const News = require("../models/news");
 
 dotenv.config();
 
-export async function fetchHeadlines() {
+async function fetchHeadlines() {
   console.log("🔄 Fetching headlines...");
-  
+
   // Create today's date (normalized to start of day in UTC)
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
@@ -27,7 +27,7 @@ export async function fetchHeadlines() {
     existing.headlines.forEach((headline, index) => {
       console.log(`   ${index + 1}. ${headline}`);
     });
-    
+
     // Convert stored string headlines back to object format for API response
     return existing.headlines.map(headline => ({
       title: headline,
@@ -97,12 +97,12 @@ export async function fetchHeadlines() {
     if (headlines.length > 0) {
       // ✅ THIRD: Save to database (store only titles as strings to match schema)
       const headlineTitles = headlines.map(h => h.title);
-      
-      await News.create({ 
-        date: todayStart, 
-        headlines: headlineTitles 
+
+      await News.create({
+        date: todayStart,
+        headlines: headlineTitles
       });
-      
+
       console.log("💾 Headlines saved to database:");
       headlineTitles.forEach((title, index) => {
         console.log(`   ${index + 1}. ${title}`);
@@ -110,11 +110,11 @@ export async function fetchHeadlines() {
     }
 
     return headlines;
-    
+
   } catch (err) {
     if (err.response && err.response.status) {
       console.error("❌ API Error:", err.response.status, err.response.data);
-      
+
       if (err.response.status === 426) {
         console.error("💡 Tip: You might need to upgrade your NewsAPI plan for more recent articles");
       }
@@ -129,17 +129,19 @@ export async function fetchHeadlines() {
 }
 
 // Route handler for API endpoint
-export async function getHeadlines(req, res) {
+async function getHeadlines(req, res) {
   try {
     const headlines = await fetchHeadlines();
-    
+
     if (headlines.length === 0) {
       return res.status(500).json({ error: "Failed to fetch headlines" });
     }
-    
+
     res.json(headlines);
   } catch (error) {
     console.error("❌ Error in getHeadlines:", error.message);
     res.status(500).json({ error: "Failed to fetch headlines" });
   }
 }
+
+module.exports = { fetchHeadlines, getHeadlines };

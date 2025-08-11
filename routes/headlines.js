@@ -1,8 +1,8 @@
-import express from 'express';
-import { getHeadlines } from '../controllers/headlinesController.js';
+const express = require('express');
+const { getHeadlines } = require('../controllers/headlinesController');
 
 const router = express.Router();
 
 router.get('/headlines', getHeadlines);
 
-export default router;
+module.exports = router;

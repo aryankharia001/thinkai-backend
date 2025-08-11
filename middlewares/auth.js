@@ -1,10 +1,10 @@
-import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
+const jwt = require("jsonwebtoken");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
 // Middleware to verify token and set req.user
-export const verifyToken = (req, res, next) => {
+const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1]; // Expecting: Bearer <token>
 
   if (!token) {
@@ -21,7 +21,7 @@ export const verifyToken = (req, res, next) => {
 };
 
 // Middleware to allow only admins
-export const isAdmin = (req, res, next) => {
+const isAdmin = (req, res, next) => {
   if (req.user.role !== "admin") {
     return res.status(403).json({ error: "Access denied. Admins only." });
   }
@@ -29,9 +29,11 @@ export const isAdmin = (req, res, next) => {
 };
 
 // Middleware to allow only users
-export const isUser = (req, res, next) => {
+const isUser = (req, res, next) => {
   if (req.user.role !== "user") {
     return res.status(403).json({ error: "Access denied. Users only." });
   }
   next();
 };
+
+module.exports = { verifyToken, isAdmin, isUser };

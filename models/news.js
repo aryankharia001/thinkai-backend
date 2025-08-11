@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const newsSchema = new mongoose.Schema({
   date: {
@@ -6,7 +6,7 @@ const newsSchema = new mongoose.Schema({
     unique: true, // Only one document per day
     default: () => {
       const d = new Date();
-      d.setUTCHours(0, 0, 0, 0); // Use UTC to avoid timezone issues
+      d.setUTCHours(0, 0, 0, 0); // Normalize to start of the day in UTC
       return d;
     }
   },
@@ -14,25 +14,17 @@ const newsSchema = new mongoose.Schema({
     type: [String], // Array of headline titles as strings
     validate: [arrayLimit, '{PATH} exceeds the limit of 5'],
     default: []
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
 }, {
-  timestamps: true // This will automatically manage createdAt and updatedAt
+  timestamps: true // Automatically manages createdAt and updatedAt
 });
 
 function arrayLimit(val) {
   return val.length <= 5;
 }
 
-// Index on date for faster queries
-newsSchema.index({ date: 1 });
+// ❌ Removed duplicate `newsSchema.index({ date: 1 })` 
+// because `unique: true` already creates an index.
 
 // Pre-save middleware to ensure date is always start of day in UTC
 newsSchema.pre('save', function(next) {
@@ -43,4 +35,4 @@ newsSchema.pre('save', function(next) {
 });
 
 const News = mongoose.model("News", newsSchema);
-export default News;
+module.exports = News;
