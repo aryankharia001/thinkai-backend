@@ -19,7 +19,7 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => {
   console.log("✅ MongoDB connected");
 
-  // Cron every 12:00 AM but API will only be called once/day
+  // Cron every 12:00 AM IST
   cron.schedule('0 0 * * *', async () => {
     console.log("⏳ Cron job triggered — fetching headlines...");
     await fetchHeadlines();
