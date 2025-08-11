@@ -7,6 +7,8 @@ const { fetchHeadlines } = require('./controllers/headlinesController');
 const AuthRoutes = require('./routes/AuthRoutes');
 const UserRoutes = require('./routes/UserRoutes');
 const CourseRoutes = require('./routes/courses');
+const PaymentRoutes = require('./routes/paymentRoutes');
+
 
 require('dotenv').config();
 
@@ -22,6 +24,8 @@ app.use('/api', headlinesRouter);
 app.use('/user', AuthRoutes);
 app.use('/api', UserRoutes);
 app.use('/api', CourseRoutes);
+app.use('/api/payment', PaymentRoutes);
+
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
