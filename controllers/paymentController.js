@@ -7,131 +7,58 @@ const instance = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-// ✅ Get available payment plans for user
-exports.getPaymentPlans = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const plans = [];
-    
-    // Basic Plan (₹200) - if user hasn't paid anything or paid less than 200
-    if (user.totalPaid < 200) {
-      plans.push({
-        id: "basic",
-        name: "Basic Plan",
-        price: 200 - user.totalPaid,
-        originalPrice: 200,
-        features: [
-          "Access to all free courses",
-          "Access to basic tier courses (up to ₹200)",
-          "Community support",
-          "Basic resources"
-        ],
-        tier: "basic"
-      });
-    }
-
-    // Premium Plan (₹1000) - if user hasn't reached premium
-    if (user.totalPaid < 1000) {
-      const premiumPrice = 1000 - user.totalPaid;
-      plans.push({
-        id: "premium",
-        name: "Premium Plan",
-        price: premiumPrice,
-        originalPrice: 1000,
-        features: [
-          "Access to ALL courses",
-          "Premium content and resources",
-          "Priority support",
-          "Downloadable materials",
-          "Lifetime access"
-        ],
-        tier: "premium",
-        recommended: true
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      currentTier: user.subscriptionTier,
-      totalPaid: user.totalPaid,
-      plans
-    });
-  } catch (error) {
-    console.error("❌ Error fetching payment plans:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ✅ Create Razorpay order
+// ✅ Simple create order without auth requirement
 exports.createOrder = async (req, res) => {
   try {
-    const { planId } = req.body; // "basic" or "premium"
-    const userId = req.user.id;
-    
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    const { amount, currency = "INR", receipt } = req.body;
 
-    let amount = 0;
-    let planType = "";
-
-    // Calculate amount based on plan and user's current payment
-    if (planId === "basic" && user.totalPaid < 200) {
-      amount = 200 - user.totalPaid;
-      planType = "basic";
-    } else if (planId === "premium" && user.totalPaid < 1000) {
-      amount = 1000 - user.totalPaid;
-      planType = "premium";
-    } else {
+    // Validate amount
+    if (!amount || amount <= 0) {
       return res.status(400).json({ 
         success: false, 
-        message: "Invalid plan or plan already purchased" 
+        message: "Valid amount is required" 
       });
     }
 
     const options = {
       amount: amount * 100, // Razorpay uses paise
-      currency: "INR",
-      receipt: `receipt_${userId}_${Date.now()}`,
-      payment_capture: 1,
-      notes: {
-        userId: userId,
-        planType: planType,
-        upgradeAmount: amount
-      }
+      currency,
+      receipt: receipt || `receipt_${Date.now()}`,
+      payment_capture: 1
     };
+
+    console.log("Creating Razorpay order with options:", options);
 
     const order = await instance.orders.create(options);
     
+    console.log("Razorpay order created successfully:", order);
+    
     res.status(200).json({ 
       success: true, 
-      order,
-      planType,
-      amount 
+      order 
     });
   } catch (error) {
     console.error("❌ Razorpay order error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || "Failed to create order"
+    });
   }
 };
 
-// ✅ Verify payment and update user
+// ✅ Payment verification and user update
 exports.verifyPayment = async (req, res) => {
   try {
     const { 
       razorpay_order_id, 
       razorpay_payment_id, 
       razorpay_signature,
+      userId,
       planType,
-      amount 
+      amount
     } = req.body;
+
+    console.log("Verifying payment:", { razorpay_order_id, razorpay_payment_id, userId, planType, amount });
 
     // Verify signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -141,82 +68,82 @@ exports.verifyPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+      console.error("❌ Payment signature verification failed");
       return res.status(400).json({ 
         success: false, 
         message: "Invalid payment signature" 
       });
     }
 
-    // Update user payment details
-    const userId = req.user.id;
+    console.log("✅ Payment signature verified successfully");
+
+    // Find and update user
     const user = await User.findById(userId);
-    
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
 
+    console.log("Found user:", user.username, "Current totalPaid:", user.totalPaid);
+
     // Add to payment history
-    user.paymentHistory.push({
+    const paymentRecord = {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
       amount: Number(amount),
+      currency: "INR",
       status: "paid",
       paidAt: new Date(),
-      planType
-    });
+      planType: planType || (amount >= 1000 ? "premium" : "basic")
+    };
+
+    user.paymentHistory.push(paymentRecord);
 
     // Update total paid amount
-    user.totalPaid += Number(amount);
+    user.totalPaid = (user.totalPaid || 0) + Number(amount);
 
     // Update legacy payment details for backward compatibility
     user.paymentDetails = {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      amount: user.totalPaid, // Total amount paid
+      amount: user.totalPaid, // Total amount paid so far
+      currency: "INR",
       status: "paid",
       paidAt: new Date()
     };
 
-    await user.save(); // This will trigger the pre-save middleware to update tier
+    // Save user (this will trigger the pre-save middleware to update subscription tier)
+    await user.save();
+
+    console.log("✅ User updated successfully:", {
+      username: user.username,
+      totalPaid: user.totalPaid,
+      subscriptionTier: user.subscriptionTier,
+      hasPaid: user.hasPaid
+    });
 
     res.status(200).json({
       success: true,
-      message: "Payment verified successfully",
+      message: "Payment verified and user updated successfully",
       user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
         totalPaid: user.totalPaid,
         subscriptionTier: user.subscriptionTier,
-        hasPaid: user.hasPaid
+        hasPaid: user.hasPaid,
+        paymentDetails: user.paymentDetails
       }
     });
   } catch (error) {
     console.error("❌ Payment verification error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ✅ Get user's payment status
-exports.getPaymentStatus = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await User.findById(userId).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    res.status(200).json({
-      success: true,
-      paymentStatus: {
-        totalPaid: user.totalPaid,
-        subscriptionTier: user.subscriptionTier,
-        hasPaid: user.hasPaid,
-        paymentHistory: user.paymentHistory
-      }
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || "Payment verification failed"
     });
-  } catch (error) {
-    console.error("❌ Error fetching payment status:", error);
-    res.status(500).json({ success: false, message: error.message });
   }
 };
