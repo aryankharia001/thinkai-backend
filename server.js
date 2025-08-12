@@ -8,6 +8,7 @@ const AuthRoutes = require('./routes/AuthRoutes');
 const UserRoutes = require('./routes/UserRoutes');
 const CourseRoutes = require('./routes/courses');
 const PaymentRoutes = require('./routes/paymentRoutes');
+const imageRoutes = require('./routes/images');
 
 
 require('dotenv').config();
@@ -25,6 +26,7 @@ app.use('/api/auth', AuthRoutes);
 app.use('/api', UserRoutes);
 app.use('/api', CourseRoutes);
 app.use('/api/payment', PaymentRoutes);
+app.use('/api/images', imageRoutes);
 
 
 // Connect to MongoDB
