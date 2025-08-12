@@ -32,8 +32,8 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionTier: {
     type: String,
-    enum: ["basic", "intermediate", "premium"],
-    default: "basic" // Basic is free after login
+    enum: ["free", "starter", "pro"], // Updated to match frontend
+    default: "free" // Free tier for new users
   },
   paymentHistory: [{
     razorpay_order_id: { type: String },
@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema({
     currency: { type: String, default: "INR" },
     status: { type: String, enum: ["created", "paid", "failed"], default: "created" },
     paidAt: { type: Date },
-    planType: { type: String } // "intermediate", "premium", or "upgrade"
+    planType: { type: String } // "starter", "pro", or "upgrade"
   }],
   // Legacy field - keeping for backward compatibility
   paymentDetails: {
@@ -63,6 +63,15 @@ const userSchema = new mongoose.Schema({
 
 // ✅ Method to check course access based on user's tier
 userSchema.methods.canAccessCourse = function(course) {
+  // Map subscription tiers to course access tiers
+  const subscriptionToAccessMapping = {
+    "free": "basic",
+    "starter": "intermediate", 
+    "pro": "premium"
+  };
+  
+  const userAccessTier = subscriptionToAccessMapping[this.subscriptionTier] || "basic";
+  
   const tierHierarchy = {
     "basic": 1,
     "intermediate": 2,
@@ -70,7 +79,7 @@ userSchema.methods.canAccessCourse = function(course) {
   };
   
   const courseTierLevel = tierHierarchy[course.accessTier] || 1;
-  const userTierLevel = tierHierarchy[this.subscriptionTier] || 1;
+  const userTierLevel = tierHierarchy[userAccessTier] || 1;
   
   return userTierLevel >= courseTierLevel;
 };
@@ -78,9 +87,9 @@ userSchema.methods.canAccessCourse = function(course) {
 // ✅ Method to get required payment amount for a specific tier
 userSchema.methods.getRequiredPaymentForTier = function(targetTier) {
   const tierPrices = {
-    "basic": 0,         // Free after login
-    "intermediate": 200, // ₹200 for intermediate
-    "premium": 500      // ₹500 for premium
+    "free": 0,        // Free tier
+    "starter": 200,   // ₹200 for starter (intermediate access)
+    "pro": 1000       // ₹1000 for pro (premium access) - FIXED FROM 500 TO 1000
   };
   
   const targetPrice = tierPrices[targetTier] || 0;
@@ -92,19 +101,27 @@ userSchema.methods.getRequiredTierForCourse = function(course) {
   if (this.canAccessCourse(course)) {
     return null; // User already has access
   }
-  return course.accessTier;
+  
+  // Map course access tier back to subscription tier
+  const accessToSubscriptionMapping = {
+    "basic": "free",
+    "intermediate": "starter",
+    "premium": "pro"
+  };
+  
+  return accessToSubscriptionMapping[course.accessTier] || "starter";
 };
 
-// ✅ Method to update subscription tier based on total paid
+// ✅ Method to update subscription tier based on total paid - FIXED PRICING
 userSchema.methods.updateSubscriptionTier = function() {
-  if (this.totalPaid >= 500) {
-    this.subscriptionTier = "premium";
+  if (this.totalPaid >= 1000) { // CHANGED FROM 500 TO 1000
+    this.subscriptionTier = "pro";
     this.hasPaid = true;
   } else if (this.totalPaid >= 200) {
-    this.subscriptionTier = "intermediate";
+    this.subscriptionTier = "starter";
     this.hasPaid = true;
   } else {
-    this.subscriptionTier = "basic"; // Basic is free for logged-in users
+    this.subscriptionTier = "free"; // Free tier for users who haven't paid
     this.hasPaid = false;
   }
 };
@@ -118,13 +135,23 @@ userSchema.pre('save', function(next) {
 // ✅ Virtual to get user's accessible courses
 userSchema.virtual('accessibleCourseTiers').get(function() {
   switch(this.subscriptionTier) {
-    case "premium":
+    case "pro":
       return ["basic", "intermediate", "premium"];
-    case "intermediate":
+    case "starter":
       return ["basic", "intermediate"];
-    default: // "basic"
+    default: // "free"
       return ["basic"];
   }
+});
+
+// ✅ Virtual to get user's access tier for course checking
+userSchema.virtual('accessTier').get(function() {
+  const mapping = {
+    "free": "basic",
+    "starter": "intermediate",
+    "pro": "premium"
+  };
+  return mapping[this.subscriptionTier] || "basic";
 });
 
 module.exports = mongoose.model("User", userSchema);

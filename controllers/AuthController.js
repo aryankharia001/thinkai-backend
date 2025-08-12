@@ -29,7 +29,7 @@ exports.SignUp = async (req, res) => {
   }
 };
 
-// ========== SIGN IN ==========
+// ========== SIGN IN - FIXED TO INCLUDE SUBSCRIPTION DATA ==========
 exports.SignIn = async (req, res) => {
   const { email, password } = req.body;
 
@@ -59,19 +59,34 @@ exports.SignIn = async (req, res) => {
 
     res.setHeader("Authorization", `Bearer ${token}`);
 
+    // ✅ CRITICAL FIX: Include ALL user data including subscription info
+    const userResponse = {
+      id: existingUser._id,
+      username: existingUser.username,
+      email: existingUser.email,
+      role: existingUser.role,
+      // ✅ ADDED: Include subscription fields
+      subscriptionTier: existingUser.subscriptionTier,
+      totalPaid: existingUser.totalPaid,
+      hasPaid: existingUser.hasPaid,
+      paymentHistory: existingUser.paymentHistory,
+      createdAt: existingUser.createdAt
+    };
+
+    console.log("✅ Login successful with full user data:", {
+      username: userResponse.username,
+      subscriptionTier: userResponse.subscriptionTier,
+      totalPaid: userResponse.totalPaid
+    });
+
     res.status(200).json({
       status: 200,
       message: "Logged in successfully",
       token,
-      user: {
-        id: existingUser._id,
-        username: existingUser.username,
-        email: existingUser.email,
-        role: existingUser.role
-      }
+      user: userResponse
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Login error:", error);
     res.status(500).json({ status: 500, message: "Error in signin" });
   }
 };
@@ -85,7 +100,20 @@ const getMe = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json({ status: 200, user });
+    // ✅ ALSO FIX: Include subscription data in getMe
+    const userResponse = {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      subscriptionTier: user.subscriptionTier,
+      totalPaid: user.totalPaid,
+      hasPaid: user.hasPaid,
+      paymentHistory: user.paymentHistory,
+      createdAt: user.createdAt
+    };
+
+    res.json({ status: 200, user: userResponse });
   } catch (error) {
     console.error("Error fetching user profile:", error);
     res.status(500).json({ error: "Server error" });

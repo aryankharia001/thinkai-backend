@@ -18,7 +18,7 @@ const courseSchema = new mongoose.Schema({
   // ✅ Price determines access tier
   price: {
     type: Number,
-    default: 0, // 0 = basic, 200 = intermediate, 500+ = premium
+    default: 0, // 0 = basic, 200 = intermediate, 1000+ = premium
     min: 0
   },
   // ✅ Access tier for easy filtering
@@ -74,44 +74,60 @@ const courseSchema = new mongoose.Schema({
   }
 });
 
-// ✅ Pre-save middleware to set access tier based on price
+// ✅ Pre-save middleware to set access tier based on price - UPDATED PRICING
 courseSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Set access tier based on price
+  // Set access tier based on price - FIXED PRICING TO MATCH FRONTEND
   if (this.price === 0) {
     this.accessTier = "basic"; // Free courses are basic tier
   } else if (this.price <= 200) {
-    this.accessTier = "intermediate";
+    this.accessTier = "intermediate"; // ₹200 or less = intermediate
   } else {
-    this.accessTier = "premium";
+    this.accessTier = "premium"; // More than ₹200 = premium (₹1000 plan)
   }
   
   next();
 });
 
 // ✅ Static method to get courses by user's subscription level
-courseSchema.statics.getCoursesByUserTier = function(userTier) {
+courseSchema.statics.getCoursesByUserTier = function(userSubscriptionTier) {
   const query = { isActive: true };
   
-  switch(userTier) {
-    case "premium":
-      // Premium users can access all courses
-      return this.find(query);
-    case "intermediate":
-      // Intermediate users can access basic and intermediate courses
-      return this.find({ 
-        ...query, 
-        accessTier: { $in: ["basic", "intermediate"] } 
-      });
-    default: // "basic"
-      // Basic users (logged-in) can access only basic courses
-      return this.find({ ...query, accessTier: "basic" });
-  }
+  // Map subscription tiers to accessible course tiers
+  const subscriptionToAccessMapping = {
+    "free": ["basic"],
+    "starter": ["basic", "intermediate"],
+    "pro": ["basic", "intermediate", "premium"],
+    // Handle legacy tiers
+    "basic": ["basic"],
+    "intermediate": ["basic", "intermediate"],
+    "premium": ["basic", "intermediate", "premium"]
+  };
+  
+  const accessibleTiers = subscriptionToAccessMapping[userSubscriptionTier] || ["basic"];
+  
+  return this.find({ 
+    ...query, 
+    accessTier: { $in: accessibleTiers } 
+  });
 };
 
 // ✅ Method to check if user can access specific course
-courseSchema.methods.canUserAccess = function(userTier) {
+courseSchema.methods.canUserAccess = function(userSubscriptionTier) {
+  // Map subscription tiers to access levels
+  const subscriptionToAccessMapping = {
+    "free": "basic",
+    "starter": "intermediate",
+    "pro": "premium",
+    // Handle legacy tiers
+    "basic": "basic",
+    "intermediate": "intermediate", 
+    "premium": "premium"
+  };
+  
+  const userAccessTier = subscriptionToAccessMapping[userSubscriptionTier] || "basic";
+  
   const tierHierarchy = {
     "basic": 1,
     "intermediate": 2,
@@ -119,7 +135,7 @@ courseSchema.methods.canUserAccess = function(userTier) {
   };
   
   const courseTierLevel = tierHierarchy[this.accessTier] || 1;
-  const userTierLevel = tierHierarchy[userTier] || 1;
+  const userTierLevel = tierHierarchy[userAccessTier] || 1;
   
   return userTierLevel >= courseTierLevel;
 };
