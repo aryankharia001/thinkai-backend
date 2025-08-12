@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
     enum: ["user", "admin"],
     default: "user"
   },
-  // ✅ Updated payment system for tiered access
+  // ✅ Updated payment system for 3-tier access
   totalPaid: {
     type: Number,
     default: 0 // Total amount paid by user
@@ -32,8 +32,8 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionTier: {
     type: String,
-    enum: ["free", "basic", "premium"], // free: 0, basic: 200+, premium: 1000+
-    default: "free"
+    enum: ["basic", "intermediate", "premium"],
+    default: "basic" // Basic is free after login
   },
   paymentHistory: [{
     razorpay_order_id: { type: String },
@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema({
     currency: { type: String, default: "INR" },
     status: { type: String, enum: ["created", "paid", "failed"], default: "created" },
     paidAt: { type: Date },
-    planType: { type: String } // "basic" or "premium" or "upgrade"
+    planType: { type: String } // "intermediate", "premium", or "upgrade"
   }],
   // Legacy field - keeping for backward compatibility
   paymentDetails: {
@@ -61,34 +61,50 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// ✅ Method to check course access based on price and user's tier
-userSchema.methods.canAccessCourse = function(coursePrice) {
-  if (coursePrice === 0) return true; // Free courses for all logged-in users
-  if (coursePrice <= 200 && this.totalPaid >= 200) return true; // Basic tier
-  if (coursePrice > 200 && this.totalPaid >= 1000) return true; // Premium tier
-  return false;
+// ✅ Method to check course access based on user's tier
+userSchema.methods.canAccessCourse = function(course) {
+  const tierHierarchy = {
+    "basic": 1,
+    "intermediate": 2,
+    "premium": 3
+  };
+  
+  const courseTierLevel = tierHierarchy[course.accessTier] || 1;
+  const userTierLevel = tierHierarchy[this.subscriptionTier] || 1;
+  
+  return userTierLevel >= courseTierLevel;
 };
 
-// ✅ Method to get required payment amount for a course
-userSchema.methods.getRequiredPayment = function(coursePrice) {
-  if (coursePrice === 0) return 0; // Free course
-  if (coursePrice <= 200) {
-    return Math.max(0, 200 - this.totalPaid); // Need at least 200 total
-  } else {
-    return Math.max(0, 1000 - this.totalPaid); // Need at least 1000 total
+// ✅ Method to get required payment amount for a specific tier
+userSchema.methods.getRequiredPaymentForTier = function(targetTier) {
+  const tierPrices = {
+    "basic": 0,         // Free after login
+    "intermediate": 200, // ₹200 for intermediate
+    "premium": 500      // ₹500 for premium
+  };
+  
+  const targetPrice = tierPrices[targetTier] || 0;
+  return Math.max(0, targetPrice - this.totalPaid);
+};
+
+// ✅ Method to get required tier for a course
+userSchema.methods.getRequiredTierForCourse = function(course) {
+  if (this.canAccessCourse(course)) {
+    return null; // User already has access
   }
+  return course.accessTier;
 };
 
 // ✅ Method to update subscription tier based on total paid
 userSchema.methods.updateSubscriptionTier = function() {
-  if (this.totalPaid >= 1000) {
+  if (this.totalPaid >= 500) {
     this.subscriptionTier = "premium";
     this.hasPaid = true;
   } else if (this.totalPaid >= 200) {
-    this.subscriptionTier = "basic";
+    this.subscriptionTier = "intermediate";
     this.hasPaid = true;
   } else {
-    this.subscriptionTier = "free";
+    this.subscriptionTier = "basic"; // Basic is free for logged-in users
     this.hasPaid = false;
   }
 };
@@ -97,6 +113,18 @@ userSchema.methods.updateSubscriptionTier = function() {
 userSchema.pre('save', function(next) {
   this.updateSubscriptionTier();
   next();
+});
+
+// ✅ Virtual to get user's accessible courses
+userSchema.virtual('accessibleCourseTiers').get(function() {
+  switch(this.subscriptionTier) {
+    case "premium":
+      return ["basic", "intermediate", "premium"];
+    case "intermediate":
+      return ["basic", "intermediate"];
+    default: // "basic"
+      return ["basic"];
+  }
 });
 
 module.exports = mongoose.model("User", userSchema);

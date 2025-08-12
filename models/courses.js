@@ -18,14 +18,14 @@ const courseSchema = new mongoose.Schema({
   // ✅ Price determines access tier
   price: {
     type: Number,
-    default: 0, // 0 = free for logged users, 200 = basic tier, 800+ = premium tier
+    default: 0, // 0 = basic, 200 = intermediate, 500+ = premium
     min: 0
   },
   // ✅ Access tier for easy filtering
   accessTier: {
     type: String,
-    enum: ["free", "basic", "premium"],
-    default: "free"
+    enum: ["basic", "intermediate", "premium"],
+    default: "basic"
   },
   duration: {
     type: String,
@@ -80,9 +80,9 @@ courseSchema.pre('save', function(next) {
   
   // Set access tier based on price
   if (this.price === 0) {
-    this.accessTier = "free";
+    this.accessTier = "basic"; // Free courses are basic tier
   } else if (this.price <= 200) {
-    this.accessTier = "basic";
+    this.accessTier = "intermediate";
   } else {
     this.accessTier = "premium";
   }
@@ -90,20 +90,38 @@ courseSchema.pre('save', function(next) {
   next();
 });
 
-// ✅ Static method to get courses by access level
-courseSchema.statics.getCoursesByAccessLevel = function(userTotalPaid) {
+// ✅ Static method to get courses by user's subscription level
+courseSchema.statics.getCoursesByUserTier = function(userTier) {
   const query = { isActive: true };
   
-  if (userTotalPaid >= 1000) {
-    // Premium user - can access all courses
-    return this.find(query);
-  } else if (userTotalPaid >= 200) {
-    // Basic user - can access free and basic courses
-    return this.find({ ...query, price: { $lte: 200 } });
-  } else {
-    // Free user - can access only free courses
-    return this.find({ ...query, price: 0 });
+  switch(userTier) {
+    case "premium":
+      // Premium users can access all courses
+      return this.find(query);
+    case "intermediate":
+      // Intermediate users can access basic and intermediate courses
+      return this.find({ 
+        ...query, 
+        accessTier: { $in: ["basic", "intermediate"] } 
+      });
+    default: // "basic"
+      // Basic users (logged-in) can access only basic courses
+      return this.find({ ...query, accessTier: "basic" });
   }
+};
+
+// ✅ Method to check if user can access specific course
+courseSchema.methods.canUserAccess = function(userTier) {
+  const tierHierarchy = {
+    "basic": 1,
+    "intermediate": 2,
+    "premium": 3
+  };
+  
+  const courseTierLevel = tierHierarchy[this.accessTier] || 1;
+  const userTierLevel = tierHierarchy[userTier] || 1;
+  
+  return userTierLevel >= courseTierLevel;
 };
 
 module.exports = mongoose.model("Course", courseSchema);
