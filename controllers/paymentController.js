@@ -97,7 +97,7 @@ exports.verifyPayment = async (req, res) => {
       currency: "INR",
       status: "paid",
       paidAt: new Date(),
-      planType: planType || (amount >= 1000 ? "premium" : "basic")
+      planType: planType || (amount >= 1000 ? "pro" : "basic")
     };
 
     user.paymentHistory.push(paymentRecord);

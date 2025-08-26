@@ -18,13 +18,13 @@ const courseSchema = new mongoose.Schema({
   // ✅ Price determines access tier
   price: {
     type: Number,
-    default: 0, // 0 = basic, 200 = intermediate, 1000+ = premium
+    default: 0, // 0 = basic, 200 = intermediate, 1000+ = pro
     min: 0
   },
   // ✅ Access tier for easy filtering
   accessTier: {
     type: String,
-    enum: ["basic", "intermediate", "premium"],
+    enum: ["basic", "intermediate", "pro"],
     default: "basic"
   },
   duration: {
@@ -47,7 +47,7 @@ const courseSchema = new mongoose.Schema({
     videoUrl: { type: String },
     duration: { type: String }, // e.g., "15 minutes"
     order: { type: Number, default: 0 },
-    isPreview: { type: Boolean, default: false } // First module can be free preview
+    isPreview: { type: Boolean, default: false } // First module can be basic preview
   }],
   // ✅ Course stats
   enrolledCount: {
@@ -84,7 +84,7 @@ courseSchema.pre('save', function(next) {
   } else if (this.price <= 200) {
     this.accessTier = "intermediate"; // ₹200 or less = intermediate
   } else {
-    this.accessTier = "premium"; // More than ₹200 = premium (₹1000 plan)
+    this.accessTier = "pro"; // More than ₹200 = pro (₹1000 plan)
   }
   
   next();
@@ -96,13 +96,13 @@ courseSchema.statics.getCoursesByUserTier = function(userSubscriptionTier) {
   
   // Map subscription tiers to accessible course tiers
   const subscriptionToAccessMapping = {
-    "free": ["basic"],
-    "starter": ["basic", "intermediate"],
-    "pro": ["basic", "intermediate", "premium"],
+    "basic": ["basic"],
+    "intermediate": ["basic", "intermediate"],
+    "pro": ["basic", "intermediate", "pro"],
     // Handle legacy tiers
     "basic": ["basic"],
     "intermediate": ["basic", "intermediate"],
-    "premium": ["basic", "intermediate", "premium"]
+    "pro": ["basic", "intermediate", "pro"]
   };
   
   const accessibleTiers = subscriptionToAccessMapping[userSubscriptionTier] || ["basic"];
@@ -117,13 +117,13 @@ courseSchema.statics.getCoursesByUserTier = function(userSubscriptionTier) {
 courseSchema.methods.canUserAccess = function(userSubscriptionTier) {
   // Map subscription tiers to access levels
   const subscriptionToAccessMapping = {
-    "free": "basic",
-    "starter": "intermediate",
-    "pro": "premium",
+    "basic": "basic",
+    "intermediate": "intermediate",
+    "pro": "pro",
     // Handle legacy tiers
     "basic": "basic",
     "intermediate": "intermediate", 
-    "premium": "premium"
+    "pro": "pro"
   };
   
   const userAccessTier = subscriptionToAccessMapping[userSubscriptionTier] || "basic";
@@ -131,7 +131,7 @@ courseSchema.methods.canUserAccess = function(userSubscriptionTier) {
   const tierHierarchy = {
     "basic": 1,
     "intermediate": 2,
-    "premium": 3
+    "pro": 3
   };
   
   const courseTierLevel = tierHierarchy[this.accessTier] || 1;

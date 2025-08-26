@@ -32,8 +32,8 @@ const userSchema = new mongoose.Schema({
   },
   subscriptionTier: {
     type: String,
-    enum: ["free", "starter", "pro"], // Updated to match frontend
-    default: "free" // Free tier for new users
+    enum: ["basic", "intermediate", "pro"], // Updated to match frontend
+    default: "basic" // Free tier for new users
   },
   paymentHistory: [{
     razorpay_order_id: { type: String },
@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema({
     currency: { type: String, default: "INR" },
     status: { type: String, enum: ["created", "paid", "failed"], default: "created" },
     paidAt: { type: Date },
-    planType: { type: String } // "starter", "pro", or "upgrade"
+    planType: { type: String } // "intermediate", "pro", or "upgrade"
   }],
   // Legacy field - keeping for backward compatibility
   paymentDetails: {
@@ -65,9 +65,9 @@ const userSchema = new mongoose.Schema({
 userSchema.methods.canAccessCourse = function(course) {
   // Map subscription tiers to course access tiers
   const subscriptionToAccessMapping = {
-    "free": "basic",
-    "starter": "intermediate", 
-    "pro": "premium"
+    "basic": "basic",
+    "intermediate": "intermediate", 
+    "pro": "pro"
   };
   
   const userAccessTier = subscriptionToAccessMapping[this.subscriptionTier] || "basic";
@@ -75,7 +75,7 @@ userSchema.methods.canAccessCourse = function(course) {
   const tierHierarchy = {
     "basic": 1,
     "intermediate": 2,
-    "premium": 3
+    "pro": 3
   };
   
   const courseTierLevel = tierHierarchy[course.accessTier] || 1;
@@ -87,9 +87,9 @@ userSchema.methods.canAccessCourse = function(course) {
 // ✅ Method to get required payment amount for a specific tier
 userSchema.methods.getRequiredPaymentForTier = function(targetTier) {
   const tierPrices = {
-    "free": 0,        // Free tier
-    "starter": 200,   // ₹200 for starter (intermediate access)
-    "pro": 1000       // ₹1000 for pro (premium access) - FIXED FROM 500 TO 1000
+    "basic": 0,        // Free tier
+    "intermediate": 200,   // ₹200 for intermediate (intermediate access)
+    "pro": 1000       // ₹1000 for pro (pro access) - FIXED FROM 500 TO 1000
   };
   
   const targetPrice = tierPrices[targetTier] || 0;
@@ -104,12 +104,12 @@ userSchema.methods.getRequiredTierForCourse = function(course) {
   
   // Map course access tier back to subscription tier
   const accessToSubscriptionMapping = {
-    "basic": "free",
-    "intermediate": "starter",
-    "premium": "pro"
+    "basic": "basic",
+    "intermediate": "intermediate",
+    "pro": "pro"
   };
   
-  return accessToSubscriptionMapping[course.accessTier] || "starter";
+  return accessToSubscriptionMapping[course.accessTier] || "intermediate";
 };
 
 // ✅ Method to update subscription tier based on total paid - FIXED PRICING
@@ -118,10 +118,10 @@ userSchema.methods.updateSubscriptionTier = function() {
     this.subscriptionTier = "pro";
     this.hasPaid = true;
   } else if (this.totalPaid >= 200) {
-    this.subscriptionTier = "starter";
+    this.subscriptionTier = "intermediate";
     this.hasPaid = true;
   } else {
-    this.subscriptionTier = "free"; // Free tier for users who haven't paid
+    this.subscriptionTier = "basic"; // Free tier for users who haven't paid
     this.hasPaid = false;
   }
 };
@@ -136,10 +136,10 @@ userSchema.pre('save', function(next) {
 userSchema.virtual('accessibleCourseTiers').get(function() {
   switch(this.subscriptionTier) {
     case "pro":
-      return ["basic", "intermediate", "premium"];
-    case "starter":
+      return ["basic", "intermediate", "pro"];
+    case "intermediate":
       return ["basic", "intermediate"];
-    default: // "free"
+    default: // "basic"
       return ["basic"];
   }
 });
@@ -147,9 +147,9 @@ userSchema.virtual('accessibleCourseTiers').get(function() {
 // ✅ Virtual to get user's access tier for course checking
 userSchema.virtual('accessTier').get(function() {
   const mapping = {
-    "free": "basic",
-    "starter": "intermediate",
-    "pro": "premium"
+    "basic": "basic",
+    "intermediate": "intermediate",
+    "pro": "pro"
   };
   return mapping[this.subscriptionTier] || "basic";
 });
