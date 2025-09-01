@@ -9,6 +9,8 @@ const UserRoutes = require('./routes/UserRoutes');
 const CourseRoutes = require('./routes/courses');
 const PaymentRoutes = require('./routes/paymentRoutes');
 const imageRoutes = require('./routes/images');
+const LibraryRoutes = require('./routes/LibraryRoutes'); 
+const ContentRoutes = require('./routes/ContentRoutes'); 
 
 
 require('dotenv').config();
@@ -18,7 +20,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: "http://localhost:5173", // frontend URL
+  origin: "*", // frontend URL
   credentials: true, // allow cookies/headers
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -33,6 +35,8 @@ app.use('/api', UserRoutes);
 app.use('/api', CourseRoutes);
 app.use('/api/payment', PaymentRoutes);
 app.use('/api/images', imageRoutes);
+app.use('/api', LibraryRoutes); 
+app.use('/api', ContentRoutes); 
 
 
 // Connect to MongoDB
