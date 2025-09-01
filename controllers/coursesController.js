@@ -4,7 +4,7 @@ const User = require('../models/UserModel');
 // ✅ Get all courses with access information
 async function getAllCourses(req, res) {
     try {
-      const courses = await Course.find({ isActive: true }).sort({ createdAt: -1 });
+      const courses = await Course.find({ isActive: true }).sort({ createdAt: 1 });
       
       // If user is authenticated, add access information
       if (req.user) {
