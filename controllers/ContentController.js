@@ -2,90 +2,13 @@ const Content = require('../models/Content');
 const Library = require('../models/Library')
 const cloudinary = require("../Utils/cloudinary"); // adjust path
 
-// const addContent = async (req, res) => {
-//   try {
-//     const { title, description, method, prompt, library } = req.body;
-
-//     if (!title || !description || !method || !prompt || !library) {
-//       return res.status(400).json({
-//         status: 400,
-//         message: "All required fields must be provided",
-//       });
-//     }
-
-//     // ✅ Check if content with same title exists
-//     const existingContent = await Content.findOne({
-//       title: { $regex: new RegExp(`^${title}$`, "i") },
-//     });
-
-//     if (existingContent) {
-//       return res.status(409).json({
-//         status: 409,
-//         message: "Content with this title already exists",
-//       });
-//     }
-
-//     // ✅ Check if library exists
-//     const existingLibrary = await Library.findById(library);
-//     if (!existingLibrary) {
-//       return res.status(404).json({
-//         status: 404,
-//         message: "Library not found",
-//       });
-//     }
-
-//     let videoUrl = null;
-
-//     // ✅ Upload video if provided
-//     if (req.file) {
-//       const uploadResponse = await cloudinary.uploader.upload(req.file.path, {
-//         resource_type: "video", // 👈 IMPORTANT for video
-//         folder: "library_videos",
-//       });
-
-//       videoUrl = uploadResponse.secure_url;
-//     }
-
-//     // ✅ Create new content
-//     const newContent = new Content({
-//       title,
-//       description,
-//       videoUrl,
-//       method,
-//       prompt,
-//       library,
-//     });
-
-//     const savedContent = await newContent.save();
-
-//     // ✅ Push into Library
-//     existingLibrary.content.push(savedContent._id);
-//     await existingLibrary.save();
-
-//     res.status(201).json({
-//       status: 201,
-//       message: "Content created successfully",
-//       data: savedContent,
-//     });
-//   } catch (error) {
-//     console.error("Error creating content:", error);
-//     res.status(500).json({
-//       status: 500,
-//       message: "Internal server error",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// Get all content
-
-
 const addContent = async (req, res) => {
   try {
-    const { title, description, method, prompt, library, videoUrl } = req.body;
-     console.log("user : ", req.body);
-    // Only check required fields (videoUrl is optional)
-    if (!title || !description || !method || !prompt || !library) {
+    const { title, description, method, prompt, library, videoUrl, icon } = req.body;
+    console.log("user : ", req.body);
+    
+    // Only check required fields (videoUrl and icon are optional)
+    if (!title || !description || !prompt || !library) {
       return res.status(400).json({
         status: 400,
         message: "All required fields must be provided (title, description, method, prompt, library)",
@@ -136,6 +59,7 @@ const addContent = async (req, res) => {
       method,
       prompt,
       library,
+      icon, // Icon field included
     });
 
     const savedContent = await newContent.save();
@@ -158,7 +82,6 @@ const addContent = async (req, res) => {
     });
   }
 };
-
 
 const getAllContent = async (req, res) => {
     try {
@@ -252,11 +175,11 @@ const getContentById = async (req, res) => {
     }
 };
 
-// Update content
+// Update content - UPDATED to include icon field
 const updateContent = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, description, videoUrl, method, prompt, library } = req.body;
+        const { title, description, videoUrl, method, prompt, library, icon } = req.body;
 
         if (!id.match(/^[0-9a-fA-F]{24}$/)) {
             return res.status(400).json({
@@ -285,15 +208,31 @@ const updateContent = async (req, res) => {
             });
         }
 
+        let finalVideoUrl = null;
+
+        // Handle video upload (file) - priority over URL
+        if (req.file) {
+            const uploadResponse = await cloudinary.uploader.upload(req.file.path, {
+                resource_type: "video",
+                folder: "library_videos",
+            });
+            finalVideoUrl = uploadResponse.secure_url;
+        } 
+        // If no file uploaded, use videoUrl from body (if provided)
+        else if (videoUrl) {
+            finalVideoUrl = videoUrl;
+        }
+
         const updatedContent = await Content.findByIdAndUpdate(
             id,
             {
                 title,
                 description,
-                videoUrl: videoUrl || null,
+                videoUrl: finalVideoUrl || null,
                 method,
                 prompt,
-                library: library || []
+                library: library || [],
+                icon: icon || null // Icon field included in update
             },
             {
                 new: true,

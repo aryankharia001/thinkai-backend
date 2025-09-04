@@ -9,12 +9,14 @@ const ContentSchema = new mongoose.Schema({
         type:String,
         required:true
     },
+    icon:{
+        type:String,
+    },
     videoUrl:{
         type:String,
     },
     method:{
         type:String,
-        required:true
     },
     prompt:{
         type:String,
