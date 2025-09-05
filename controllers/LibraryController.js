@@ -88,7 +88,7 @@ const getLibraryById = async (req, res) => {
         }
 
         const library = await Library.findById(id)
-            .populate('content', 'title description contentType views likes');
+            .populate('content', 'icon title description contentType views likes ');
 
         if (!library) {
             return res.status(404).json({
