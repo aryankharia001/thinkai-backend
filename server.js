@@ -29,6 +29,7 @@ const PaymentRoutes = require('./routes/paymentRoutes');
 const imageRoutes = require('./routes/images');
 const LibraryRoutes = require('./routes/LibraryRoutes');
 const ContentRoutes = require('./routes/ContentRoutes');
+const { fetchAIHeadlines } = require('./controllers/AiNewsController');
 
 // API Routes (must come before static files)
 app.use('/api', headlinesRouter);
@@ -67,7 +68,8 @@ mongoose.connect(process.env.MONGO_URI)
     cron.schedule('0 0 * * *', async () => {
       console.log("⏰ Cron job triggered — fetching headlines...");
       try {
-        await fetchHeadlines();
+        await fetchHeadlines();    // fetching header headlines
+        await fetchAIHeadlines();  // fetching ai headlines for library
       } catch (error) {
         console.error("❌ Error in cron job:", error);
       }
