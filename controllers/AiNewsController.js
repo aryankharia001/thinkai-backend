@@ -5,7 +5,7 @@ const AINews = require("../models/AiNews");
 dotenv.config();
 
 async function fetchAIHeadlines() {
-  console.log("🔄 Fetching 30 AI headlines...");
+  console.log("🔄 Fetching up to 30 AI headlines...");
 
   // Normalize today's date (UTC start of day)
   const todayStart = new Date();
@@ -23,17 +23,7 @@ async function fetchAIHeadlines() {
 
   if (existing && existing.headlines && existing.headlines.length > 0) {
     console.log("✅ AI headlines already stored for today, skipping API call.");
-    console.log("📰 Returning stored AI headlines...");
-    existing.headlines.forEach((headline, i) => {
-      console.log(`   ${i + 1}. ${headline}`);
-    });
-
-    return existing.headlines.map((headline) => ({
-      title: headline,
-      url: "#", // placeholder since only titles stored
-      description: "",
-      publishedAt: existing.date,
-    }));
+    return existing.headlines;
   }
 
   console.log("📡 No existing AI headlines found, calling News API...");
@@ -53,12 +43,12 @@ async function fetchAIHeadlines() {
       from: twentyFourHoursAgo.toISOString(),
       to: now.toISOString(),
       sortBy: "publishedAt",
-      pageSize: 60, // ✅ get 30 articles
+      pageSize: 60, // request more, filter down to 30
       language: "en",
       apiKey,
     };
 
-    console.log("🌐 Calling NewsAPI for 30 AI headlines...");
+    console.log("🌐 Calling NewsAPI...");
     let articles = (
       await axios.get("https://newsapi.org/v2/everything", { params })
     ).data.articles || [];
@@ -75,7 +65,7 @@ async function fetchAIHeadlines() {
     console.log(`📊 Found ${articles.length} articles, filtering for AI...`);
 
     const filteredArticles = articles.filter((article) => {
-      const title = article.title.toLowerCase();
+      const title = (article.title || "").toLowerCase();
       const description = (article.description || "").toLowerCase();
       return (
         title.includes("ai") ||
@@ -92,22 +82,20 @@ async function fetchAIHeadlines() {
     console.log(`🎯 Found ${filteredArticles.length} AI-related articles`);
 
     const headlines = filteredArticles.slice(0, 30).map((article) => ({
-      title: article.title.trim(),
+      title: article.title?.trim(),
+      description: article.description || "",
       url: article.url,
-      description: article.description,
       publishedAt: article.publishedAt,
     }));
 
     if (headlines.length > 0) {
-      const headlineTitles = headlines.map((h) => h.title);
-
       await AINews.create({
         date: todayStart,
-        headlines: headlineTitles,
+        headlines,
       });
 
-      console.log("💾 30 AI headlines saved to DB:");
-      headlineTitles.forEach((t, i) => console.log(`   ${i + 1}. ${t}`));
+      console.log("💾 Headlines saved to DB:");
+      headlines.forEach((h, i) => console.log(`   ${i + 1}. ${h.title}`));
     }
 
     return headlines;
